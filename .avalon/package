@@ -1,4 +1,6 @@
 {
+	"author": "r2boyo25",
+	"repo": "kazmoduleloader",
     "installScript": ".avalon/install.sh",
     "uninstallScript": ".avalon/uninstall.sh"
 }

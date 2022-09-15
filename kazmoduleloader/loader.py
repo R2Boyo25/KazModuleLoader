@@ -1,6 +1,7 @@
 from importlib import import_module
 import os
 import sys
+from .dag import Graph
 
 
 class Context:
@@ -32,14 +33,15 @@ class Loader:
     def setLogger(self, logger):
         self.globals["logger"] = logger
 
-    def loadFile(self, filename: str) -> None:
+    def loadFile(self, filename: str, root: str = "") -> None:
         sfilename = os.path.splitext(os.path.basename(filename))[0]
         directory = os.path.dirname(filename).replace(
             "./", "").strip("/").strip("\\")
         importdir = directory.replace("/", ".").replace("\\", ".")
         toimport = (importdir + ".") + sfilename
 
-        self.modules[filename.lower()] = import_module(toimport)
+        self.modules[filename.lower().lstrip(root).lstrip("/")
+                     ] = import_module(toimport)
 
     def loadDir(self, dirname: str = "plugins") -> None:
         reldir = os.path.dirname(sys.argv[0]) + "./" + dirname
@@ -47,25 +49,41 @@ class Loader:
             if "__pycache__" in root:
                 continue
             for file in files:
-                self.loadFile(root + "/" + file)
+                self.loadFile(root + "/" + file, root)
 
-    def getFunction(self, funcname: str) -> list:
-        functions = []
+    def getAttribute(self, attrname: str, custommodulelist: list = None) -> list:
+        attributes = []
 
-        for module in self.modules:
-            omodule = self.modules[module]
-            for attributename in self.getAttrs(omodule):
-                if attributename != funcname:
-                    continue
+        if not custommodulelist:
+            for module in self.modules:
+                omodule = self.modules[module]
+                for attributename in self.getAttrs(omodule):
+                    if attributename != attrname:
+                        continue
 
-                attribute = getattr(omodule, attributename)
+                    attribute = getattr(omodule, attributename)
 
-                if str(type(attribute)) != "<class 'function'>":
-                    continue
+                    attributes.append(attribute)
+        else:
+            for omodule in custommodulelist:
+                for attributename in self.getAttrs(omodule):
+                    if attributename != attrname:
+                        continue
 
-                functions.append(attribute)
+                    attribute = getattr(omodule, attributename)
 
-        return functions
+                    attributes.append(attribute)
+
+        return attributes
+
+    def getFunction(self, funcname: str, custommodulelist: list = None) -> list:
+        return filter(lambda x: str(type(x)) == "<class 'function'>", self.getAttribute(funcname, custommodulelist))
+
+    def getValueOfAttribute(self, module, attrname: str) -> list:
+        for attributename in self.getAttrs(module):
+            if attributename == attrname:
+                attribute = getattr(module, attributename)
+                return attribute if str(type(attribute)) != "<class 'function'>" else attribute()
 
     def getAttrs(self, module) -> list:
         filteredattrs = []
@@ -76,6 +94,23 @@ class Loader:
 
         return filteredattrs
 
-    def setupModules(self):
-        for setup in self.getFunction("setup"):
+    def loadOrder(self) -> list:
+        m = list(self.modules.keys())
+        g = Graph(len(self.modules))
+
+        for i, modulen in enumerate(m):
+            module = self.modules[modulen]
+
+            ds = self.getValueOfAttribute(module, "dependencies")
+
+            if not ds:
+                continue
+
+            for dependency in ds:
+                g.addEdge(i, m.index(dependency))
+
+        return [self.modules[m[i]] for i in reversed(g.topologicalSort())]
+
+    def setupModules(self) -> None:
+        for setup in self.getFunction("setup", self.loadOrder()):
             setup(Context(log=self.log, **self.globals))
