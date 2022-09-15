@@ -1,5 +1,6 @@
 from importlib import import_module
 import os
+import sys
 
 
 class Context:
@@ -41,7 +42,7 @@ class Loader:
         self.modules[filename.lower()] = import_module(toimport)
 
     def loadDir(self, dirname: str = "plugins") -> None:
-        reldir = os.path.dirname(__file__.lstrip(os.getcwd())) + "./" + dirname
+        reldir = os.path.dirname(sys.argv[0]) + "./" + dirname
         for root, _, files in os.walk(reldir):
             if "__pycache__" in root:
                 continue
