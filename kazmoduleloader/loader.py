@@ -103,11 +103,15 @@ class Loader:
 
             ds = self.getValueOfAttribute(module, "dependencies")
 
-            if not ds:
-                continue
+            if ds:
+                for dependency in ds:
+                    g.addEdge(i, m.index(dependency))
 
-            for dependency in ds:
-                g.addEdge(i, m.index(dependency))
+            rd = self.getValueOfAttribute(module, "reversedependencies")
+
+            if rd:
+                for rdep in rd:
+                    g.addEdge(m.index(rdep), i)
 
         return [self.modules[m[i]] for i in reversed(g.topologicalSort())]
 
