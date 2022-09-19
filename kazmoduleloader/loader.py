@@ -50,6 +50,7 @@ class Loader:
         self.modules = {}
         self.globals = globals if globals else {}
         self.globals["modules"] = self.modules
+        self.globals["loader"] = self
 
     def log(self, type, *text) -> None:
         if "logger" not in self.globals:
