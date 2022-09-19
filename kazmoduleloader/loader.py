@@ -11,6 +11,39 @@ class Context:
     def __getattr__(self, name):
         return self.attrs[name]
 
+def walkDir(dirname: str) -> list:
+    out = []
+
+    if not os.path.exists(dirname):
+        return []
+
+    entries = os.listdir(dirname)
+
+    index = 0
+    while index < len(entries):
+
+        entry = dirname + "/" + entries[index]
+
+        if os.path.isdir(entry):
+
+            if entry.endswith("__pycache__"):
+                index += 1
+                continue
+
+            if os.path.exists(entry + "/__init__.py"):
+                out.append(entry)
+            
+            else:
+                entries = [*entries, *[entry.lstrip(dirname + "/") + "/" + e for e in os.listdir(entry)]]
+
+        elif os.path.isfile(entry):
+
+            if entry.lower().endswith(".py"):
+                out.append(entry)
+        
+        index += 1
+
+    return out
 
 class Loader:
     def __init__(self, globals: dict = None):
@@ -18,7 +51,7 @@ class Loader:
         self.globals = globals if globals else {}
         self.globals["modules"] = self.modules
 
-    def log(self, type, *text):
+    def log(self, type, *text) -> None:
         if "logger" not in self.globals:
             return
 
@@ -30,26 +63,23 @@ class Loader:
         else:
             self.globals["logger"].warning(type)
 
-    def setLogger(self, logger):
+    def setLogger(self, logger) -> None:
         self.globals["logger"] = logger
 
-    def loadFile(self, filename: str, root: str = "") -> None:
+    def loadFile(self, filename: str) -> None:
         sfilename = os.path.splitext(os.path.basename(filename))[0]
         directory = os.path.dirname(filename).replace(
             "./", "").strip("/").strip("\\")
         importdir = directory.replace("/", ".").replace("\\", ".")
         toimport = (importdir + ".") + sfilename
 
-        self.modules[filename.lower().lstrip(root).lstrip("/")
+        self.modules[os.path.basename(filename)
                      ] = import_module(toimport)
 
     def loadDir(self, dirname: str = "plugins") -> None:
         reldir = os.path.dirname(sys.argv[0]) + "./" + dirname
-        for root, _, files in os.walk(reldir):
-            if "__pycache__" in root:
-                continue
-            for file in files:
-                self.loadFile(root + "/" + file, root)
+        for plugin in walkDir(reldir):
+            self.loadFile(plugin)
 
     def getAttribute(self, attrname: str, custommodulelist: list = None) -> list:
         attributes = []
